@@ -1,13 +1,15 @@
 @extends('layout')
 @section('title', 'Play')
 @section('content')
-<section class="card hero">
+<div class="play-head">
     <h1>Gin Rummy</h1>
-    @auth
-        <p>Welcome back, {{ auth()->user()->name }}. The table is being set up — game coming soon.</p>
-    @else
-        <p>Form melds, knock, and go gin. <a href="{{ route('login') }}">Log in</a> or <a href="{{ route('register') }}">register</a> to track your games.</p>
-    @endauth
-    <div id="table" class="felt"></div>
-</section>
+    <p class="small">
+        @auth Good luck, {{ auth()->user()->name }}. @else Playing as guest — <a href="{{ route('login') }}">log in</a> to keep your name on the table. @endauth
+        Knock at 10 or less deadwood · Gin scores +25 · First to 100.
+    </p>
+</div>
+<div id="gin" class="gin"><noscript>Gin Rummy needs JavaScript.</noscript></div>
 @endsection
+@push('scripts')
+<script src="{{ asset('js/ginrummy.js') }}?v={{ filemtime(public_path('js/ginrummy.js')) }}" defer></script>
+@endpush

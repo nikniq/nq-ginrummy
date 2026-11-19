@@ -1,11 +1,13 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Inter:wght@400;600&display=swap" rel="stylesheet">
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>@yield('title', 'Play') · NQ Gin Rummy</title>
-    <link rel="stylesheet" href="{{ asset('css/ginrummy.css') }}">
+    <link rel="stylesheet" href="{{ asset('css/ginrummy.css') }}?v={{ filemtime(public_path('css/ginrummy.css')) }}">
 </head>
 <body>
 <header class="topbar">
