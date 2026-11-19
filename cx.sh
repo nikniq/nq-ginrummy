@@ -7,18 +7,18 @@
 #   ./cx.sh 33 "migrate:status"   # option with a parameter
 #
 # Runs on your LOCAL machine. Its server counterpart is deploy.sh.
-# Requires vars.sh (copy vars.sh.example).
+#
+# Settings live below; override any of them per run with env vars,
+# e.g. REMOTE=other-host ./cx.sh 30
 #================================================================
 
 cd "$(dirname "$0")"
 
-if [ ! -f ./vars.sh ]; then
-  echo "vars.sh not found — copy vars.sh.example to vars.sh and fill it in."
-  exit 1
-fi
-source ./vars.sh
-REMOTE_APP="${REMOTE_APP:-$PROJECT}"
-APP_URL="${APP_URL:-https://$PROJECT}"
+PROJECT="nq-ginrummy"
+REMOTE="${REMOTE:-nq}"                                   # ssh alias in ~/.ssh/config
+REMOTE_APP="${REMOTE_APP:-www/ginrummy.nikniq.com}"      # app root on server, relative to ~
+APP_URL="${APP_URL:-https://ginrummy.nikniq.com}"
+APP_SSH="${APP_SSH:-ssh}"
 
 log_history() {
   mkdir -p ./log
