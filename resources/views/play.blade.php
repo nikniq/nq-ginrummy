@@ -5,7 +5,7 @@
     <h1>Gin Rummy</h1>
     <p class="small">
         @auth Good luck, {{ auth()->user()->name }}. @else Playing as guest — <a href="{{ route('login') }}">log in</a> to keep your name on the table. @endauth
-        Knock at 10 or less deadwood · Gin scores +25 · First to 100.
+        Knock at 10 or less deadwood · Gin scores +25 · First to 100. <a href="{{ route('rules') }}">How to play</a>
     </p>
 </div>
 <div id="gin" class="gin"><noscript>Gin Rummy needs JavaScript.</noscript></div>

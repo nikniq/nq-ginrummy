@@ -14,6 +14,7 @@
     <a href="{{ route('play') }}" class="brand">🂡 NQ Gin Rummy</a>
     <nav>
         <a href="{{ route('play') }}">Play</a>
+        <a href="{{ route('rules') }}">How to play</a>
         @auth
             <form method="POST" action="{{ route('logout') }}" class="inline">
                 @csrf

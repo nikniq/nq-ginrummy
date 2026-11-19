@@ -134,3 +134,13 @@ html,body{overflow-x:hidden}
   .gbtn{padding:8px 13px;font-size:13px}
   .scorebar{grid-template-columns:auto 1fr auto}
 }
+
+/* rules page */
+.rules{max-width:760px;margin:0 auto;line-height:1.6}
+.rules h1{margin-top:0}.rules h2{margin:26px 0 6px;font-size:22px}
+.rules .lead{font-size:17px;color:var(--muted)}
+.rules .c{font-family:"Playfair Display",serif;font-weight:700;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:1px 6px;white-space:nowrap}
+.rules .c.r{color:#c22a2a}
+.rules .score{border-collapse:collapse;width:100%}
+.rules .score th,.rules .score td{text-align:left;padding:8px;border-top:1px solid var(--border);vertical-align:top}
+.rules .score th{width:100px}
