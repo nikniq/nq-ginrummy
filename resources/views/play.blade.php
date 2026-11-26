@@ -8,7 +8,7 @@
         Knock at 10 or less deadwood · Gin scores +25 · First to 100. <a href="{{ route('rules') }}">How to play</a>
     </p>
 </div>
-<div id="gin" class="gin"><noscript>Gin Rummy needs JavaScript.</noscript></div>
+<div id="gin" class="gin" data-rules-url="{{ route('rules') }}"><noscript>Gin Rummy needs JavaScript.</noscript></div>
 @endsection
 @push('scripts')
 <script src="{{ asset('js/ginrummy.js') }}?v={{ filemtime(public_path('js/ginrummy.js')) }}" defer></script>

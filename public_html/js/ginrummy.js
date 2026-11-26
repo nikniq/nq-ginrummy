@@ -102,7 +102,16 @@
         stock: [], discard: [], hand: { p: [], o: [] },
         turn: 'p', phase: 'draw', selected: null, takenId: null,
         lastId: null, dealing: false, arrange: 'melds', busy: false, hint: null,
+        oppTaken: [], youTaken: [], oppTossed: [],
+        coach: true, level: 'normal',
     };
+    const store = {
+        get(k, d) { try { const v = localStorage.getItem('gin.' + k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } },
+        set(k, v) { try { localStorage.setItem('gin.' + k, JSON.stringify(v)); } catch (e) { /* ignore */ } },
+    };
+    S.coach = store.get('coach', true);
+    S.level = store.get('level', 'normal');
+    const RULES_URL = root.dataset.rulesUrl || '/how-to-play';
     let stats = { won: 0, lost: 0 };
     try { stats = JSON.parse(localStorage.getItem('gin.stats')) || stats; } catch (e) { /* storage unavailable */ }
     const saveStats = () => { try { localStorage.setItem('gin.stats', JSON.stringify(stats)); } catch (e) { /* ignore */ } };
@@ -117,6 +126,7 @@
         S.stock = d;
         S.turn = S.dealer === 'o' ? 'p' : 'o';
         S.phase = 'draw'; S.selected = null; S.takenId = null; S.lastId = null; S.hint = null;
+        S.oppTaken = []; S.youTaken = []; S.oppTossed = [];
         S.dealing = true;
         render();
         setTimeout(() => { S.dealing = false; }, 1400);
@@ -147,8 +157,18 @@
         </div>
         <div class="overlay" hidden></div>
       </div>
-      <p class="small center-text">Record: <b data-st="won">0</b> won · <b data-st="lost">0</b> lost.
-         Click a pile to draw; click a card to select it, click again (or press Discard) to throw it.</p>`;
+      <div class="coach" aria-live="polite">
+        <div class="coach-head"><span class="coach-ico">🎓</span><b>Coach</b>
+          <label class="sw"><input type="checkbox" data-opt="coach"><span></span></label></div>
+        <div class="coach-body"></div>
+      </div>
+      <div class="toolbar">
+        <button class="tbtn" data-act="tutorial">📖 How to play</button>
+        <button class="tbtn" data-act="rules">❓ Quick rules</button>
+        <label class="tsel">Opponent
+          <select data-opt="level"><option value="easy">Easy</option><option value="normal">Normal</option><option value="hard">Hard</option></select></label>
+        <span class="small">Record: <b data-st="won">0</b> won · <b data-st="lost">0</b> lost</span>
+      </div>`;
 
     const q = s => root.querySelector(s);
     const msg = t => { q('.msg').textContent = t; };
@@ -245,6 +265,9 @@
         kb.textContent = dwAfter === 0 ? 'Gin!' : 'Knock';
         q('[data-act="hint"]').disabled = !(S.turn === 'p' && S.phase !== 'over' && !S.busy);
         q('[data-act="arrange"]').textContent = 'Sort: ' + S.arrange;
+        q('[data-opt="coach"]').checked = S.coach;
+        q('[data-opt="level"]').value = S.level;
+        renderCoach();
     }
 
     // ---------- player actions ----------
@@ -258,13 +281,20 @@
         if (act === 'knock') playerDiscard(true);
         if (act === 'arrange') { S.arrange = { melds: 'rank', rank: 'suit', suit: 'melds' }[S.arrange]; render(); }
         if (act === 'hint') hint();
+        if (act === 'tutorial') tutorial(0);
+        if (act === 'rules') quickRules();
+    });
+    root.addEventListener('change', e => {
+        const o = e.target.dataset.opt;
+        if (o === 'coach') { S.coach = e.target.checked; store.set('coach', S.coach); render(); }
+        if (o === 'level') { S.level = e.target.value; store.set('level', S.level); msg(`Opponent set to ${S.level}.`); }
     });
 
     function draw(which) {
         if (S.turn !== 'p' || S.phase !== 'draw' || S.busy) return;
         let c;
         if (which === 'stock') { if (!S.stock.length) return; c = S.stock.pop(); S.takenId = null; }
-        else { if (!S.discard.length) return; c = S.discard.pop(); S.takenId = c.id; }
+        else { if (!S.discard.length) return; c = S.discard.pop(); S.takenId = c.id; S.youTaken.push(c); }
         S.hand.p.push(c); S.lastId = c.id; S.phase = 'discard'; S.hint = null; S.selected = null;
         msg(which === 'stock' ? `You drew the ${RANKS[c.r]}${SUITS[c.s]}. Choose a card to discard.` : 'Choose a card to discard (not the one you just took).');
         render();
@@ -308,6 +338,15 @@
         return bd.a.dw < analyze(hand).dw && !bd.a.deadwood.includes(up);
     }
 
+    function aiDiscard(hand, forbidId) {
+        const opts = hand.filter(c => c.id !== forbidId)
+            .map(c => ({ card: c, a: analyze(hand.filter(x => x !== c)) }))
+            .sort((x, y) => x.a.dw - y.a.dw || val(y.card) - val(x.card));
+        if (S.level === 'easy' && Math.random() < 0.4) return opts[Math.floor(Math.random() * Math.min(4, opts.length))];
+        if (S.level === 'hard') return opts.find(x => x.a.dw <= opts[0].a.dw + 3 && !feeds(S.youTaken, x.card)) || opts[0];
+        return opts[0];
+    }
+
     async function aiTurn() {
         S.busy = true; render();
         msg('Computer is thinking…');
@@ -319,12 +358,14 @@
         o.push(c); S.lastId = c.id; render();
         msg(take ? `Computer took the ${RANKS[c.r]}${SUITS[c.s]}.` : 'Computer drew from the stock.');
         await sleep(800);
-        const bd = bestDiscard(o, take ? c.id : null);
+        if (take) S.oppTaken.push(c);
+        const bd = aiDiscard(o, take ? c.id : null);
         S.hand.o = o.filter(x => x !== bd.card);
-        S.discard.push(bd.card); S.lastId = bd.card.id;
+        S.discard.push(bd.card); S.lastId = bd.card.id; S.oppTossed.push(bd.card);
         S.busy = false;
         const dw = bd.a.dw;
-        if (dw === 0 || (dw <= 10 && (dw <= 5 || S.stock.length < 16))) return endHand('o');
+        const knockAt = { easy: dw <= 10, normal: dw <= 5 || S.stock.length < 16, hard: dw <= 7 || S.stock.length < 20 }[S.level];
+        if (dw === 0 || (dw <= 10 && knockAt)) return endHand('o');
         if (S.stock.length <= 2) return endHand(null);
         S.turn = 'p'; S.phase = 'draw';
         msg(`Computer discarded the ${RANKS[bd.card.r]}${SUITS[bd.card.s]}. Your turn.`);
@@ -391,15 +432,160 @@
         }
         const btn = el('button', 'gbtn gold', over ? 'New game' : 'Next hand');
         btn.addEventListener('click', () => {
-            ov.hidden = true;
+            ov.hidden = true; resultHtml = null;
             if (over) { S.scores = { p: 0, o: 0 }; S.wins = { p: 0, o: 0 }; }
             deal();
         });
         box.appendChild(btn);
         ov.appendChild(box);
+        resultHtml = box;
         ov.hidden = false;
         render();
     }
 
-    deal();
+    // ---------- coach ----------
+    const nm = c => `<span class="cn ${c.s === 1 || c.s === 2 ? 'r' : ''}">${RANKS[c.r]}${SUITS[c.s]}</span>`;
+    const describe = m => isSet(m)
+        ? `a set of ${RANKS[m[0].r]}s`
+        : `a run ${RANKS[m[0].r]}–${RANKS[m[m.length - 1].r]}${SUITS[m[0].s]}`;
+
+    /** Why the other player might want this card, given the cards they took from the discard pile. */
+    function feeds(taken, card) {
+        for (const x of taken) {
+            if (x.r === card.r) return `they picked up the ${RANKS[x.r]}${SUITS[x.s]} — likely collecting ${RANKS[x.r]}s`;
+            if (x.s === card.s && Math.abs(x.r - card.r) <= 2) return `they picked up the ${RANKS[x.r]}${SUITS[x.s]} — likely building a ${SUITS[x.s]} run`;
+        }
+        return null;
+    }
+    function connected(hand, c) {
+        return hand.some(x => x !== c && (x.r === c.r || (x.s === c.s && Math.abs(x.r - c.r) <= 2)));
+    }
+    function helpers(hand) {
+        const seen = new Set([...hand, ...S.discard].map(c => c.id));
+        const cur = analyze(hand).dw, out = [];
+        for (let s2 = 0; s2 < 4; s2++) for (let r = 1; r <= 13; r++) {
+            const c = { r, s: s2, id: r + '-' + s2 };
+            if (seen.has(c.id)) continue;
+            const bd = bestDiscard([...hand, c], null);
+            if (bd.card !== c && bd.a.dw < cur) out.push({ c, gain: cur - bd.a.dw });
+        }
+        return out.sort((a, b) => b.gain - a.gain).map(x => x.c);
+    }
+
+    function renderCoach() {
+        const box = q('.coach');
+        box.classList.toggle('off', !S.coach);
+        const body = q('.coach-body');
+        if (!S.coach) { body.innerHTML = '<span class="small">Coach is off. Switch it on for move-by-move advice.</span>'; return; }
+        const tips = [];
+        const hand = S.hand.p;
+        if (S.pendingDeal || !hand.length) {
+            tips.push('Finish the walkthrough and the cards will be dealt. Leave the coach on for advice every turn.');
+        } else if (S.phase === 'over') {
+            tips.push('Hand over — read the result, then deal the next hand.');
+        } else if (S.turn === 'o' || S.busy) {
+            tips.push('The computer is playing. Watch which cards it <b>takes</b> from the discard pile — they tell you what it is collecting.');
+        } else if (S.phase === 'draw') {
+            const up = S.discard[S.discard.length - 1];
+            const cur = analyze(hand);
+            if (up) {
+                const bd = bestDiscard([...hand, up], up.id);
+                const m = bd.a.melds.find(mm => mm.includes(up));
+                if (m && bd.a.dw < cur.dw) tips.push(`<b>Take the up-card ${nm(up)}.</b> It makes ${describe(m)} and cuts your deadwood from ${cur.dw} to ${bd.a.dw}.`);
+                else tips.push(`The up-card ${nm(up)} doesn't build a meld for you — <b>draw from the stock</b> instead. Taking it also tells the computer what you need.`);
+            }
+            const h = helpers(hand);
+            if (h.length) tips.push(`Cards that would help you (${h.length} still unseen): ${h.slice(0, 10).map(nm).join(' ')}${h.length > 10 ? ' …' : ''}`);
+            if (cur.dw <= 10) tips.push('Your deadwood is already 10 or less — after you draw and discard, you can probably <b>knock</b>.');
+        } else {
+            const bd = bestDiscard(hand, S.takenId);
+            const sel = hand.find(c => c.id === S.selected);
+            if (bd.a.dw === 0) tips.push(`<b>You can go Gin!</b> Select ${nm(bd.card)} and press <b>Gin!</b> — worth a 25-point bonus.`);
+            else if (bd.a.dw <= 10) tips.push(`<b>You can knock</b> with ${bd.a.dw} deadwood by discarding ${nm(bd.card)}. ${bd.a.dw <= 4 ? 'That is a strong knock — do it.' : 'Lower is safer: if the computer ends with the same or less deadwood after laying off, you get undercut.'}`);
+            else {
+                const why = !connected(hand, bd.card)
+                    ? `it is ${val(bd.card)} points of deadwood with no nearby cards to pair with`
+                    : `it leaves the lowest deadwood (${bd.a.dw})`;
+                tips.push(`Suggested discard: ${nm(bd.card)} — ${why}.`);
+            }
+            if (sel) {
+                const after = analyze(hand.filter(c => c !== sel));
+                const inMeld = analyze(hand).melds.find(m => m.includes(sel));
+                if (inMeld) tips.push(`⚠ ${nm(sel)} is part of ${describe(inMeld)}. Breaking it leaves ${after.dw} deadwood (best is ${bd.a.dw}).`);
+                else if (after.dw > bd.a.dw) tips.push(`Discarding ${nm(sel)} leaves ${after.dw} deadwood — ${after.dw - bd.a.dw} more than the best choice.`);
+                const f = feeds(S.oppTaken, sel);
+                if (f) tips.push(`⚠ Careful: ${nm(sel)} may help the computer — ${f}.`);
+            }
+            if (S.takenId) tips.push('You can\'t throw back the card you just took (marked ⟲).');
+        }
+        if (S.phase !== 'over' && S.oppTaken.length) tips.push(`Computer has picked up: ${S.oppTaken.map(nm).join(' ')}. Avoid discarding cards that fit with these.`);
+        body.innerHTML = tips.map(t => `<p>${t}</p>`).join('');
+    }
+
+    // ---------- tutorial & rules ----------
+    const C = (r, s) => cardEl({ r, s, id: 'x' + r + s }).outerHTML;
+    const meldHtml = cards => `<div class="group meld">${cards.join('')}</div>`;
+    const SLIDES = [
+        { t: 'Welcome to Gin Rummy', b: `<p>You play against the computer. Each of you gets <b>10 cards</b>.</p>
+            <p>Your goal is to group your cards into <b>melds</b> and keep the points left over as low as possible. First to <b>100 points</b> wins.</p>` },
+        { t: 'Melds: sets and runs', b: `<div class="demo">${meldHtml([C(7, 0), C(7, 1), C(7, 2)])}<span>A <b>set</b>: 3 or 4 cards of the same rank.</span></div>
+            <div class="demo">${meldHtml([C(4, 1), C(5, 1), C(6, 1), C(7, 1)])}<span>A <b>run</b>: 3+ cards in a row, same suit. Ace is low only.</span></div>
+            <p>The game arranges your melds for you and underlines them in gold.</p>` },
+        { t: 'Deadwood', b: `<div class="demo"><div class="group dead">${C(13, 0)}${C(9, 2)}${C(1, 3)}</div><span>Cards not in a meld are <b>deadwood</b>: K = 10, 9 = 9, A = 1 → 20 points.</span></div>
+            <p>Face cards count 10, aces 1, everything else its number. Your total is shown under your hand.</p>` },
+        { t: 'Your turn', b: `<ol><li><b>Draw</b>: click the face-down <b>stock</b>, or the face-up card on the <b>discard pile</b>.</li>
+            <li><b>Discard</b>: click a card to select it, then click it again (or press <b>Discard</b>).</li></ol>
+            <p>You can't throw back a card you just took from the discard pile.</p>` },
+        { t: 'Knock or go Gin', b: `<p>When your deadwood would be <b>10 or less</b>, select your discard and press <b>Knock</b> to end the hand.</p>
+            <p>All 10 cards in melds? That's <b>Gin!</b> — a 25-point bonus.</p>
+            <p>The other player can <b>lay off</b> loose cards onto the knocker's melds. If they end up with equal or less deadwood, it's an <b>undercut</b> and they score instead.</p>
+            <p>Stuck? Press <b>Hint</b>, or leave the <b>🎓 Coach</b> on for advice every turn.</p>` },
+    ];
+    function tutorial(i) {
+        const ov = q('.overlay');
+        const sl = SLIDES[i];
+        ov.innerHTML = `<div class="result tut">
+            <div class="dots">${SLIDES.map((_, j) => `<i class="${j === i ? 'on' : ''}"></i>`).join('')}</div>
+            <h2>${sl.t}</h2><div class="tut-body">${sl.b}</div>
+            <div class="tut-nav">
+              <button class="gbtn ghosty dark" data-tut="skip">${i === SLIDES.length - 1 ? 'Close' : 'Skip'}</button>
+              ${i > 0 ? '<button class="gbtn" data-tut="prev">Back</button>' : ''}
+              ${i < SLIDES.length - 1 ? '<button class="gbtn gold" data-tut="next">Next</button>' : '<button class="gbtn gold" data-tut="skip">Let\'s play</button>'}
+            </div></div>`;
+        ov.hidden = false;
+        ov.querySelectorAll('[data-tut]').forEach(b => b.addEventListener('click', () => {
+            const a = b.dataset.tut;
+            if (a === 'next') tutorial(i + 1);
+            else if (a === 'prev') tutorial(i - 1);
+            else { store.set('tutorialSeen', true); closeOverlay(); }
+        }));
+    }
+    function quickRules() {
+        const ov = q('.overlay');
+        ov.innerHTML = `<div class="result tut rules-q"><h2>Quick rules</h2>
+            <ul>
+              <li><b>Meld</b>: a set (3–4 of a rank) or a run (3+ in a row, same suit; ace low).</li>
+              <li><b>Deadwood</b>: unmelded cards. A = 1, 2–10 face value, J/Q/K = 10.</li>
+              <li><b>Turn</b>: draw 1 (stock or discard pile), then discard 1.</li>
+              <li><b>Knock</b>: end the hand with deadwood ≤ 10. Score the difference.</li>
+              <li><b>Gin</b>: 0 deadwood. 25 bonus + opponent's deadwood; no laying off.</li>
+              <li><b>Lay off</b>: defender adds loose cards to the knocker's melds.</li>
+              <li><b>Undercut</b>: defender ≤ knocker → defender scores 25 + difference.</li>
+              <li><b>Game</b>: first to 100. +100 game bonus, +25 per hand won.</li>
+            </ul>
+            <p class="small"><a href="${RULES_URL}" target="_blank" rel="noopener">Full rules and tips →</a></p>
+            <div class="tut-nav"><button class="gbtn gold" data-tut="close">Back to the game</button></div></div>`;
+        ov.hidden = false;
+        ov.querySelector('[data-tut]').addEventListener('click', closeOverlay);
+    }
+    let resultHtml = null;
+    function closeOverlay() {
+        const ov = q('.overlay');
+        if (S.pendingDeal) { S.pendingDeal = false; ov.hidden = true; deal(); return; }
+        if (S.phase === 'over' && resultHtml) { ov.innerHTML = ''; ov.appendChild(resultHtml); return; }
+        ov.hidden = true;
+    }
+
+    if (store.get('tutorialSeen', false)) deal();
+    else { S.pendingDeal = true; render(); tutorial(0); }
 })();

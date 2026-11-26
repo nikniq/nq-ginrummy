@@ -50,6 +50,8 @@
         <li>Watch what the computer picks up — don't feed it cards that fit its melds.</li>
         <li>Knocking early with low deadwood often beats waiting for gin, but beware of being undercut.</li>
         <li>Stuck? Press <b>Hint</b> for a suggested draw or discard.</li>
+        <li>Leave the <b>🎓 Coach</b> switched on (under the table) for advice every turn: whether to take the face-up card, the best discard and why, when you can knock, which cards would help you, and warnings when a discard might feed the computer.</li>
+        <li>New to the game? Set the opponent to <b>Easy</b>. On <b>Hard</b> the computer watches what you pick up and avoids feeding you.</li>
     </ul>
 
     <p><a href="{{ route('play') }}" class="btn">Play now</a></p>
