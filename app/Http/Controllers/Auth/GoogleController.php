@@ -24,14 +24,18 @@ class GoogleController extends Controller
 
     public function redirect(): SymfonyRedirect|RedirectResponse
     {
-        abort_unless(self::enabled(), 404);
+        if (! self::enabled()) {
+            return redirect()->route('login')->withErrors(['email' => 'Google sign-in is not available yet. Please use email for now.']);
+        }
 
         return Socialite::driver('google')->redirect();
     }
 
     public function callback(Request $request): RedirectResponse
     {
-        abort_unless(self::enabled(), 404);
+        if (! self::enabled()) {
+            return redirect()->route('login')->withErrors(['email' => 'Google sign-in is not available yet. Please use email for now.']);
+        }
 
         try {
             $google = Socialite::driver('google')->user();

@@ -1,7 +1,7 @@
 @extends('layout')
 @section('title', 'How to play')
 @section('content')
-<article class="card rules">
+<article class="panel rules">
     <h1>How to play Gin Rummy</h1>
     <p class="lead">A two-player card game: build your hand into sets and runs, keep the leftover points low, and end the hand before your opponent does.</p>
 
@@ -36,7 +36,7 @@
     <h2>Laying off</h2>
     <p>When someone knocks, the other player can add deadwood cards to the knocker's melds — e.g. a 8♥ onto a 5♥ 6♥ 7♥ run. Those cards no longer count. This happens for you automatically. You can't lay off against gin.</p>
 
-    <h2>Scoring</h2>
+    <h2 id="scoring">Scoring</h2>
     <table class="score">
         <tr><th>Knock</th><td>The knocker scores the difference between the two deadwood totals.</td></tr>
         <tr><th>Gin</th><td>25 bonus + the opponent's deadwood.</td></tr>

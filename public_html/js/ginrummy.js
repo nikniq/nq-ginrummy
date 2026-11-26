@@ -8,6 +8,20 @@
     const SUITS = ['♠', '♥', '♦', '♣'];
     const RANKS = ['', 'A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
     const TARGET = 100;
+    const COURT = { 11: '⚔', 12: '❀', 13: '♛' };
+    // Pip positions (x%, y%) inside the card's centre area, as on a traditional deck.
+    const L = 22, M = 50, R = 78;
+    const PIPS = {
+        2: [[M, 8], [M, 92]],
+        3: [[M, 8], [M, 50], [M, 92]],
+        4: [[L, 8], [R, 8], [L, 92], [R, 92]],
+        5: [[L, 8], [R, 8], [M, 50], [L, 92], [R, 92]],
+        6: [[L, 8], [R, 8], [L, 50], [R, 50], [L, 92], [R, 92]],
+        7: [[L, 8], [R, 8], [M, 29], [L, 50], [R, 50], [L, 92], [R, 92]],
+        8: [[L, 8], [R, 8], [M, 29], [L, 50], [R, 50], [M, 71], [L, 92], [R, 92]],
+        9: [[L, 8], [R, 8], [L, 36], [R, 36], [M, 50], [L, 64], [R, 64], [L, 92], [R, 92]],
+        10: [[L, 8], [R, 8], [M, 22], [L, 36], [R, 36], [L, 64], [R, 64], [M, 78], [L, 92], [R, 92]],
+    };
     const val = c => Math.min(c.r, 10);
     const sum = cs => cs.reduce((t, c) => t + val(c), 0);
     const byRank = (a, b) => a.r - b.r || a.s - b.s;
@@ -154,6 +168,7 @@
           <button class="gbtn gold" data-act="knock" disabled>Knock</button>
           <button class="gbtn ghosty" data-act="hint">Hint</button>
           <button class="gbtn ghosty" data-act="arrange">Sort: melds</button>
+          <button class="gbtn ghosty icon" data-act="fullscreen" title="Full screen (F)" aria-label="Full screen">⛶</button>
         </div>
         <div class="overlay" hidden></div>
       </div>
@@ -165,6 +180,7 @@
       <div class="toolbar">
         <button class="tbtn" data-act="tutorial">📖 How to play</button>
         <button class="tbtn" data-act="rules">❓ Quick rules</button>
+        <button class="tbtn" data-act="fullscreen">⛶ Full screen</button>
         <label class="tsel">Opponent
           <select data-opt="level"><option value="easy">Easy</option><option value="normal">Normal</option><option value="hard">Hard</option></select></label>
         <span class="small">Record: <b data-st="won">0</b> won · <b data-st="lost">0</b> lost</span>
@@ -180,14 +196,14 @@
         e.dataset.id = c.id;
         const idx = `<span class="rk">${RANKS[c.r]}</span><span class="st">${SUITS[c.s]}</span>`;
         let center;
-        if (face) center = `<div class="court"><span>${RANKS[c.r]}</span><em>${SUITS[c.s]}</em></div>`;
+        if (face) center = `<div class="court"><b class="orn">${COURT[c.r]}</b><span>${RANKS[c.r]}</span><em>${SUITS[c.s]}</em></div>`;
         else if (c.r === 1) center = `<div class="ace">${SUITS[c.s]}</div>`;
-        else center = `<div class="pips p${c.r}">${Array(c.r).fill(`<i>${SUITS[c.s]}</i>`).join('')}</div>`;
+        else center = `<div class="pips">${PIPS[c.r].map(([x, y]) => `<i style="left:${x}%;top:${y}%"${y > 55 ? ' class="flip"' : ''}>${SUITS[c.s]}</i>`).join('')}</div>`;
         e.innerHTML = `<div class="corner tl">${idx}</div>${center}<div class="corner br">${idx}</div>`;
         if (opts.cls) e.classList.add(...opts.cls.split(' '));
         return e;
     }
-    const backEl = () => el('div', 'card back');
+    const backEl = () => el('div', 'card back', '<span class="emb">NQ</span>');
 
     function arranged() {
         const h = S.hand.p;
@@ -283,6 +299,37 @@
         if (act === 'hint') hint();
         if (act === 'tutorial') tutorial(0);
         if (act === 'rules') quickRules();
+        if (act === 'fullscreen') toggleFullscreen();
+    });
+
+    // Real fullscreen where supported; otherwise (iPhone Safari) the table fills the window.
+    const isFs = () => document.fullscreenElement === root || document.webkitFullscreenElement === root || root.classList.contains('pseudo-fs');
+    function toggleFullscreen() {
+        if (isFs()) {
+            if (root.classList.contains('pseudo-fs')) root.classList.remove('pseudo-fs');
+            else (document.exitFullscreen || document.webkitExitFullscreen).call(document);
+        } else {
+            const req = root.requestFullscreen || root.webkitRequestFullscreen;
+            if (req) Promise.resolve(req.call(root)).catch(() => root.classList.add('pseudo-fs'));
+            else root.classList.add('pseudo-fs');
+        }
+        setTimeout(syncFs, 50);
+    }
+    function syncFs() {
+        const on = isFs();
+        document.body.classList.toggle('fs-lock', root.classList.contains('pseudo-fs'));
+        root.querySelectorAll('[data-act="fullscreen"]').forEach(b => {
+            b.setAttribute('aria-pressed', on);
+            if (b.classList.contains('tbtn')) b.textContent = on ? '⤓ Exit full screen' : '⛶ Full screen';
+            else b.textContent = on ? '✕' : '⛶';
+        });
+    }
+    document.addEventListener('fullscreenchange', syncFs);
+    document.addEventListener('webkitfullscreenchange', syncFs);
+    document.addEventListener('keydown', e => {
+        if (e.target.closest('input,select,textarea') || e.metaKey || e.ctrlKey || e.altKey) return;
+        if (e.key === 'f' || e.key === 'F') toggleFullscreen();
+        if (e.key === 'Escape' && root.classList.contains('pseudo-fs')) toggleFullscreen();
     });
     root.addEventListener('change', e => {
         const o = e.target.dataset.opt;

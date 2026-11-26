@@ -35,7 +35,9 @@ class NikniqController extends Controller
 
     public function redirect(Request $request): RedirectResponse
     {
-        abort_unless(self::enabled(), 404);
+        if (! self::enabled()) {
+            return redirect()->route('login')->withErrors(['email' => 'nikniq.com sign-in is not available yet. Please use email for now.']);
+        }
 
         $state = Str::random(40);
         $verifier = Str::random(64);
@@ -60,7 +62,9 @@ class NikniqController extends Controller
 
     public function callback(Request $request): RedirectResponse
     {
-        abort_unless(self::enabled(), 404);
+        if (! self::enabled()) {
+            return redirect()->route('login')->withErrors(['email' => 'nikniq.com sign-in is not available yet. Please use email for now.']);
+        }
 
         $silent = (bool) $request->session()->pull('nikniq_silent', false);
         $state = (string) $request->session()->pull('nikniq_state', '');

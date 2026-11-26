@@ -1,0 +1,1 @@
+<svg class="nq-mark" viewBox="0 0 24 24" aria-hidden="true"><defs><linearGradient id="nqg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ff3d8b"/><stop offset="1" stop-color="#7b3fe4"/></linearGradient></defs><rect width="24" height="24" rx="6" fill="url(#nqg)"/><path d="M7 17V7h2.2l5.6 6.6V7H17v10h-2.2L9.2 10.4V17z" fill="#fff"/></svg>
